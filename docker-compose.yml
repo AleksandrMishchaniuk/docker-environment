@@ -1,0 +1,73 @@
+version: "3.1"
+services:
+  some_proj-nginx:
+    image: nginx:alpine
+    container_name: some_proj-nginx
+    volumes:
+      - "./application:/var/www/app"
+      - "./logs/nginx:/var/log/nginx"
+      - "./config/nginx/conf.d:/etc/nginx/conf.d"
+    expose:
+      - 80
+    environment:
+      VIRTUAL_HOST: deliveryua.local
+      VIRTUAL_PORT: 80
+      LETSENCRYPT_HOST: deliveryua.local
+      LETSENCRYPT_EMAIL: mishchaniuk.aleksandr@gmail.com
+    links:
+      - some_proj-app
+  some_proj-app:
+    image: mishchaniuk/php7.4-dev:1.1.1
+    container_name: some_proj-app
+    volumes:
+      - "./application:/var/www/app"
+      - "./config/php/conf.d/custom.ini:/usr/local/etc/php/conf.d/custom.ini"
+      - "./logs/php:/usr/local/var/log"
+      - "./.composer:/var/www/.composer"
+    working_dir: /var/www/app
+    user: www-data
+    environment:
+      XDEBUG_CONFIG: "remote_host=192.168.223.1 remote_enable=1 idekey=PHPSTORM remote_port=9003"
+      PHP_IDE_CONFIG: "serverName=Docker"
+    links:
+      - some_proj-db
+    networks:
+      - default
+      - xdebug
+  some_proj-db:
+    image: mysql:5.7
+    container_name: some_proj-db
+    command: mysqld --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci --init-connect='SET NAMES UTF8mb4;' --innodb-flush-log-at-trx-commit=0
+    volumes:
+      - "./data/db:/var/lib/mysql"
+      - "./config/db/custom.cnf:/etc/mysql/conf.d/custom.cnf"
+      - "./logs/db:/var/log/mysql"
+    ports:
+      - "3310:3306"
+    expose:
+      - 3306
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: developer
+      MYSQL_PASSWORD: alex123
+      MYSQL_DATABASE: some_proj
+
+  some_proj-node:
+    image: node:slim
+    container_name: some_proj-node
+    user: "node"
+    volumes:
+      - "./application:/home/node/app"
+    working_dir: /home/node/app
+    tty: true
+
+networks:
+  default:
+    external:
+      name: nginx-proxy
+  xdebug:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.223.0/28
